@@ -1,0 +1,129 @@
+library(dplyr)
+library(tidyverse)
+
+# Import Datasets
+amazon_products <- read.csv("amazon.csv")
+walmart_products <- read_csv("walmart.csv")
+
+# Summarize data sets (Also Converted Rupees in Amazon dataset to USD)
+# str_remove_all() removes all of that character from the string vector
+amazon_summary_df <- amazon_products |>
+  reframe(
+    product_name,
+    rating_count = rating_count |> as.numeric(),
+    average_rating = rating,
+    actual_price_usd = round(
+      actual_price |>
+        str_remove_all("₹") |>
+        str_remove_all(",") |>
+        as.numeric() * 0.012,
+      2
+    )
+  )
+walmart_summary_df <- walmart_products |>
+  reframe(
+    product_name = Title,
+    rating_count = `Num Of Reviews` |> as.numeric(),
+    actual_price_usd = Price,
+    average_rating = `Average Rating`
+  )
+
+# Clean Amazon and Walmart Dataset Summary
+walmart_summary_df <- walmart_summary_df |>
+  filter(!is.na(rating_count),
+         !is.na(product_name),
+         !is.na(average_rating),
+         rating_count > 0
+  )
+
+amazon_summary_df <- amazon_summary_df |>
+  filter(!is.na(rating_count),
+         !is.na(product_name),
+         !is.na(average_rating),
+         rating_count > 0
+  )
+# Mutate and Modify Columns, Add Price Range and Sum up Total Reviews 
+# case_when() works as an "if...else" scenario, on "dplyr" documentation
+
+amazon_summary_df <- amazon_summary_df |>
+  mutate(
+    price_range = case_when(
+      actual_price_usd < 50  ~ "Low-Range",
+      actual_price_usd < 200 ~ "Medium-Range",
+      actual_price_usd >= 200 ~ "High-Range"
+    )
+  )
+
+walmart_summary_df <- walmart_summary_df |>
+  mutate(
+    price_range = case_when(
+      actual_price_usd < 50  ~ "Low-Range",
+      actual_price_usd < 200 ~ "Medium-Range",
+      actual_price_usd >= 200 ~ "High-Range"
+    )
+  )
+
+# Rank top 100 most reviewed per price tier in each dataset
+# slice_max selects rows with the largest values of a variable
+# (Side Note: The Amazon dataset doesn't have enough product data--specifically High-End and Low-End products-- to create a full top 100 (not even top 30 D:). Because of this, 
+# the merge has to be a one-to-one with the Amazon product data, and we scrap the rest of the Walmart products (very inefficient).)
+amazon_top100 <- amazon_summary_df |>
+  group_by(price_range) |>
+  slice_max(order_by = rating_count, n = 100) |>
+  mutate(rank = row_number())
+
+walmart_top100 <- walmart_summary_df |>
+  group_by(price_range) |>
+  slice_max(order_by = rating_count, n = 100) |>
+  mutate(rank = row_number())
+
+
+# One-to-one match by price_range, and then rank, keeping only Amazon rows with a Walmart match
+# rename() renames each variable, could have just renamed it from summary but I am lazy. 
+combined_df <- amazon_top100 |>
+  left_join(walmart_top100, join_by(price_range, rank)) |>
+  rename(
+    amazon_product  = product_name.x,
+    amazon_price    = actual_price_usd.x,
+    amazon_reviews  = rating_count.x,
+    amazon_rating = average_rating.x,
+    walmart_product = product_name.y,
+    walmart_price   = actual_price_usd.y,
+    walmart_reviews = rating_count.y,
+    walmart_rating = average_rating.y
+  )
+
+glimpse(combined_df)
+
+# Convert Walmart and Amazon Rating to Numeric, filter out NA rating values
+combined_df <- combined_df |>
+  mutate(
+    amazon_rating = amazon_rating |> as.numeric(), 
+    walmart_rating = walmart_rating |> as.numeric()
+    ) |>
+  filter(!is.na(amazon_rating), !is.na(walmart_rating))
+# Add average total rating
+combined_df <- combined_df |>
+  group_by(price_range) |>
+  mutate(
+    amazon_avg_rating  = round(mean(amazon_rating,  na.rm = TRUE), 2),
+    walmart_avg_rating = round(mean(walmart_rating, na.rm = TRUE), 2)
+  )
+
+rating_summary <- combined_df |>
+  group_by(price_range) |>
+  summarise(
+    amazon_avg = mean(amazon_rating, na.rm = TRUE),
+    walmart_avg = mean(walmart_rating, na.rm = TRUE)
+  )
+
+ggplot(rating_summary, aes(x = price_range)) +
+  geom_col(aes(y = amazon_avg, fill = "Amazon"), position = "dodge") +
+  geom_col(aes(y = walmart_avg, fill = "Walmart"), position = "dodge") +
+  labs(
+    title = "Average Ratings by Price Range",
+    x = "Price Range",
+    y = "Average Rating",
+    fill = "Platform"
+  )
+

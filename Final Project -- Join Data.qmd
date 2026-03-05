@@ -1,0 +1,18 @@
+---
+title: "Final Project -- Join Data"
+author: "BB10"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+Data Source Our datasets come from Kaggle: Amazon Sales Dataset: https://www.kaggle.com/datasets/karkavelrajaj/amazon-sales-dataset Walmart Product Data: https://www.kaggle.com/datasets/promptcloud/walmart-product-data Both datasets contain real product listings scraped from Amazon and Walmart and are hosted on Kaggle, a widely used platform for sharing real-world datasets. The data includes product names, prices, and review counts, making it suitable for exploratory analysis of pricing and customer engagement.
+
+Data Meaning Each dataset represents online product listings from Amazon and Walmart. Important fields include product name/title, price, and number of reviews. Because both datasets contain similar product information, they allow us to compare pricing and customer engagement across the two platforms.
+
+Data Join We joined the datasets using product name (Amazon’s product_name and Walmart’s Title). Before joining, we: Converted Amazon prices from rupees to U.S. dollars Removed rows with missing product names Filtered out Walmart products with zero reviews We then performed an inner join, keeping only products that appear in both datasets.
+
+Data Observations Using glimpse(), we observed: Amazon columns: product name, rating count, and price (stored as formatted strings) Walmart columns: product title, number of reviews, and numeric price Each dataset contains thousands of rows, with one row per product.
+
+Data Issues: We identified several issues: Missing product names NA (removed before joining) Amazon prices stored as strings with currency symbols (cleaned and converted to USD) Some Walmart products had zero reviews (filtered out) These issues required cleaning but did not significantly affect the overall reliability of the datasets.
